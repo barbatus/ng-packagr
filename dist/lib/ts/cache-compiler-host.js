@@ -1,105 +1,76 @@
-import * as ts from 'typescript';
-import * as ng from '@angular/compiler-cli';
-import * as path from 'path';
-import * as pug from 'pug';
-import { ensureUnixPath } from '../util/path';
-import { StylesheetProcessor } from '../ng-v5/entry-point/resources/stylesheet-processor';
-import { EntryPointNode, fileUrl } from '../ng-v5/nodes';
-import { Node } from '../brocc/node';
-import { BuildGraph } from '../brocc/build-graph';
-
-export function cacheCompilerHost(
-  graph: BuildGraph,
-  entryPoint: EntryPointNode,
-  compilerOptions: ng.CompilerOptions,
-  moduleResolutionCache: ts.ModuleResolutionCache,
-  stylesheetProcessor?: StylesheetProcessor
-): ng.CompilerHost {
+'use strict';
+Object.defineProperty(exports, '__esModule', { value: true });
+const ts = require('typescript');
+const ng = require('@angular/compiler-cli');
+const path = require('path');
+const pug = require('pug');
+const path_1 = require('../util/path');
+const nodes_1 = require('../ng-v5/nodes');
+const node_1 = require('../brocc/node');
+function cacheCompilerHost(graph, entryPoint, compilerOptions, moduleResolutionCache, stylesheetProcessor) {
   const { sourcesFileCache } = entryPoint.cache;
   const compilerHost = ng.createCompilerHost({ options: compilerOptions });
-  const addDependee = (fileName: string) => {
-    const nodeUri = fileUrl(ensureUnixPath(fileName));
+  const addDependee = fileName => {
+    const nodeUri = nodes_1.fileUrl(path_1.ensureUnixPath(fileName));
     let node = graph.get(nodeUri);
-
     if (!node) {
-      node = new Node(nodeUri);
+      node = new node_1.Node(nodeUri);
       graph.put(node);
     }
-
     entryPoint.dependsOn(node);
   };
-
-  return {
-    ...compilerHost,
-
+  return Object.assign({}, compilerHost, {
     // ts specific
-    fileExists: (fileName: string) => {
+    fileExists: fileName => {
       const cache = sourcesFileCache.getOrCreate(fileName);
       if (cache.exists === undefined) {
         cache.exists = compilerHost.fileExists.call(this, fileName);
       }
       return cache.exists;
     },
-
-    getSourceFile: (fileName: string, languageVersion: ts.ScriptTarget) => {
+    getSourceFile: (fileName, languageVersion) => {
       addDependee(fileName);
-
       const cache = sourcesFileCache.getOrCreate(fileName);
       if (!cache.sourceFile) {
         cache.sourceFile = compilerHost.getSourceFile.call(this, fileName, languageVersion);
       }
       return cache.sourceFile;
     },
-
-    writeFile: (
-      fileName: string,
-      data: string,
-      writeByteOrderMark: boolean,
-      onError?: (message: string) => void,
-      sourceFiles?: ReadonlyArray<ts.SourceFile>
-    ) => {
+    writeFile: (fileName, data, writeByteOrderMark, onError, sourceFiles) => {
       if (fileName.endsWith('.d.ts')) {
         sourceFiles.forEach(source => {
           const cache = sourcesFileCache.getOrCreate(source.fileName);
           if (!cache.declarationFileName) {
-            cache.declarationFileName = ensureUnixPath(fileName);
+            cache.declarationFileName = path_1.ensureUnixPath(fileName);
           }
         });
       }
-
       compilerHost.writeFile.call(this, fileName, data, writeByteOrderMark, onError, sourceFiles);
     },
-
-    readFile: (fileName: string) => {
+    readFile: fileName => {
       addDependee(fileName);
-
       const cache = sourcesFileCache.getOrCreate(fileName);
       if (cache.content === undefined) {
         cache.content = compilerHost.readFile.call(this, fileName);
       }
       return cache.content;
     },
-
     // ng specific
-    moduleNameToFileName: (moduleName: string, containingFile: string) => {
+    moduleNameToFileName: (moduleName, containingFile) => {
       const { resolvedModule } = ts.resolveModuleName(
         moduleName,
-        ensureUnixPath(containingFile),
+        path_1.ensureUnixPath(containingFile),
         compilerOptions,
         compilerHost,
         moduleResolutionCache
       );
-
       return resolvedModule && resolvedModule.resolvedFileName;
     },
-
-    resourceNameToFileName: (resourceName: string, containingFilePath: string) => {
+    resourceNameToFileName: (resourceName, containingFilePath) => {
       return path.resolve(path.dirname(containingFilePath), resourceName);
     },
-
-    readResource: (fileName: string) => {
+    readResource: fileName => {
       addDependee(fileName);
-
       const cache = sourcesFileCache.getOrCreate(fileName);
       if (cache.content === undefined) {
         // todo: transform styles here.
@@ -112,8 +83,9 @@ export function cacheCompilerHost(
         }
         cache.exists = true;
       }
-
       return cache.content;
     }
-  };
+  });
 }
+exports.cacheCompilerHost = cacheCompilerHost;
+//# sourceMappingURL=cache-compiler-host.js.map
